@@ -2,77 +2,70 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Wanderworld</title>
-  <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
+
 <body>
 
-  <!-- JOIN SCREEN -->
-  <div id="join-screen">
-    <div class="join-box">
-      <div class="join-title-row">
-        <img src="https://tinkr.tech/sdb_apps/wanderworld/images/cow.png" class="join-cow" />
-        <h1 class="join-title">Wanderworld</h1>
-        <img src="https://tinkr.tech/sdb_apps/wanderworld/images/cow.png" class="join-cow flip" />
-      </div>
-      <p class="join-sub">A shared pixel world. Roam, chat, exist.</p>
-      <div class="join-field-row">
-        <input id="username-input" type="text" maxlength="20" placeholder="Enter your name..." spellcheck="false" />
-        <button id="join-btn">Enter World</button>
-      </div>
-      <p id="join-error" class="join-error"></p>
-      <div class="join-sprites">
-        <img src="https://tinkr.tech/sdb_apps/wanderworld/images/player.png" />
-        <img src="https://tinkr.tech/sdb_apps/wanderworld/images/skeleton.png" />
-        <img src="https://tinkr.tech/sdb_apps/wanderworld/images/chicken.png" />
-        <img src="https://tinkr.tech/sdb_apps/wanderworld/images/pig.png" />
-        <img src="https://tinkr.tech/sdb_apps/wanderworld/images/sheep.png" />
-        <img src="https://tinkr.tech/sdb_apps/wanderworld/images/slime.png" />
+<div id="join-screen">
+  <div class="join-box">
+    <h1 class="logo">Wanderworld</h1>
+    <p>A shared pixel world. Roam, chat, exist.</p>
+
+    <input id="username-input" placeholder="Enter your name..." />
+    <button id="join-btn">Enter World</button>
+
+    <p id="join-error"></p>
+  </div>
+</div>
+
+<div id="game-screen" class="hidden">
+
+  <div id="hud">
+    <span id="hud-player-name"></span>
+
+    <div>
+      <span id="player-count">👥 0</span>
+      <button id="talk-btn">💬 Talk</button>
+      <button id="leave-btn">✖ Leave</button>
+    </div>
+  </div>
+
+  <div id="world-wrapper">
+    <div id="world-container"></div>
+    <div id="history-panel">
+      <h3>💬 chat history</h3>
+      <div id="history-log">
+        <div class="history-empty">no messages yet 🌱</div>
       </div>
     </div>
   </div>
 
-  <!-- GAME SCREEN -->
-  <div id="game-screen" class="hidden">
+</div>
 
-    <!-- HUD top bar -->
-    <div id="hud">
-      <div class="hud-left">
-        <span class="hud-logo">🌍 Wanderworld</span>
-        <span id="hud-player-name" class="hud-name"></span>
-      </div>
-      <div class="hud-right">
-        <span id="player-count" class="hud-count">👥 0</span>
-        <button id="talk-btn" class="hud-btn">💬 Talk</button>
-        <button id="leave-btn" class="hud-btn danger">✖ Leave</button>
-      </div>
+<div id="talk-panel" class="hidden">
+  <div class="talk-box">
+    <p>What do you say?</p>
+    <textarea id="talk-input"></textarea>
+
+    <div>
+      <button id="talk-send-btn">Send</button>
+      <button id="talk-cancel-btn">Cancel</button>
     </div>
 
-    <!-- WORLD MAP WRAPPER -->
-    <div id="world-wrapper">
-      <div id="world-container"></div>
-    </div>
-
-    <!-- TALK PANEL -->
-    <div id="talk-panel" class="hidden">
-      <div class="talk-box">
-        <p class="talk-label">What do you say?</p>
-        <textarea id="talk-input" maxlength="200" placeholder="Say something..." rows="3"></textarea>
-        <div class="talk-actions">
-          <button id="talk-send-btn">Send</button>
-          <button id="talk-cancel-btn" class="cancel">Cancel</button>
-        </div>
-        <p id="talk-error" class="join-error"></p>
-      </div>
-    </div>
-
-    <!-- CLICK HINT -->
-    <div id="click-hint">Click the map to move</div>
-
+    <p id="talk-error"></p>
   </div>
+</div>
 
-  <script src="game.js"></script>
+<img class="floating-sticker" src="https://cdn140.picsart.com/321871657366211.png">
+
+<iframe class="spotify-player"
+  src="https://open.spotify.com/embed/playlist/5jvzy0iygMijho1O0EUMvl"
+  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture">
+</iframe>
+
+<script src="game.js"></script>
 </body>
 </html>
