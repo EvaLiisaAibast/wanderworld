@@ -1,66 +1,50 @@
-/* =============================================
-   WANDERWORLD — game.js
-   No var, no template literals, no fancy syntax
-   ============================================= */
+
 
 const API_URL = "https://tinkr.tech/sdb/Wanderworld/Wanderworld";
 
-// ── State ────────────────────────────────────
 let playerKey = null;
 let myUsername = null;
 let pollInterval = null;
-let lastPlayerCount = 0;
+let chatHistory = []; 
 
-// ── DOM refs ─────────────────────────────────
-const joinScreen      = document.getElementById("join-screen");
-const gameScreen      = document.getElementById("game-screen");
-const usernameInput   = document.getElementById("username-input");
-const joinBtn         = document.getElementById("join-btn");
-const joinError       = document.getElementById("join-error");
-const worldContainer  = document.getElementById("world-container");
-const hudPlayerName   = document.getElementById("hud-player-name");
-const playerCount     = document.getElementById("player-count");
-const talkBtn         = document.getElementById("talk-btn");
-const talkPanel       = document.getElementById("talk-panel");
-const talkInput       = document.getElementById("talk-input");
-const talkSendBtn     = document.getElementById("talk-send-btn");
-const talkCancelBtn   = document.getElementById("talk-cancel-btn");
-const talkError       = document.getElementById("talk-error");
-const leaveBtn        = document.getElementById("leave-btn");
+const joinScreen    = document.getElementById("join-screen");
+const gameScreen    = document.getElementById("game-screen");
 
-// ── Init: restore session ────────────────────
+const usernameInput = document.getElementById("username-input");
+const joinBtn       = document.getElementById("join-btn");
+const joinError     = document.getElementById("join-error");
+
+const worldContainer = document.getElementById("world-container");
+const hudPlayerName  = document.getElementById("hud-player-name");
+const playerCount    = document.getElementById("player-count");
+
+const talkBtn       = document.getElementById("talk-btn");
+const talkPanel     = document.getElementById("talk-panel");
+const talkInput     = document.getElementById("talk-input");
+const talkSendBtn   = document.getElementById("talk-send-btn");
+const talkCancelBtn = document.getElementById("talk-cancel-btn");
+const talkError     = document.getElementById("talk-error");
+
+const leaveBtn      = document.getElementById("leave-btn");
+
+const historyLog    = document.getElementById("history-log");
+
+init();
+
 function init() {
-  let savedKey  = localStorage.getItem("ww_player_key");
-  let savedName = localStorage.getItem("ww_username");
-
-  if (savedKey && savedName) {
-    playerKey  = savedKey;
-    myUsername = savedName;
-    enterGame();
-  }
+  joinBtn.onclick = handleJoin;
 
   usernameInput.addEventListener("keydown", function(e) {
-    if (e.key === "Enter") {
-      handleJoin();
-    }
+    if (e.key === "Enter") handleJoin();
   });
 
-  joinBtn.addEventListener("click", handleJoin);
+  talkBtn.onclick    = openTalk;
+  talkCancelBtn.onclick = closeTalk;
+  talkSendBtn.onclick   = handleTalk;
 
-  worldContainer.addEventListener("click", handleWorldClick);
-
-  talkBtn.addEventListener("click", function() {
-    talkPanel.classList.remove("hidden");
-    talkInput.value = "";
-    talkError.textContent = "";
-    talkInput.focus();
+  talkPanel.addEventListener("click", function(e) {
+    if (e.target === talkPanel) closeTalk();
   });
-
-  talkCancelBtn.addEventListener("click", function() {
-    talkPanel.classList.add("hidden");
-  });
-
-  talkSendBtn.addEventListener("click", handleTalk);
 
   talkInput.addEventListener("keydown", function(e) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -69,236 +53,274 @@ function init() {
     }
   });
 
-  talkPanel.addEventListener("click", function(e) {
-    if (e.target === talkPanel) {
-      talkPanel.classList.add("hidden");
-    }
-  });
-
-  leaveBtn.addEventListener("click", handleLeave);
+  leaveBtn.onclick = handleLeave;
+  worldContainer.addEventListener("click", handleMove);
 }
 
-// ── Join ─────────────────────────────────────
 function handleJoin() {
-  let username = usernameInput.value.trim();
+  const username = usernameInput.value.trim();
+
   if (!username) {
-    joinError.textContent = "Please enter a name.";
+    joinError.textContent = "enter a name first 🌱";
     return;
   }
 
-  joinBtn.disabled = true;
-  joinBtn.textContent = "Entering...";
   joinError.textContent = "";
-
-  let body = JSON.stringify({ action: "join", username: username });
+  joinBtn.disabled  = true;
+  joinBtn.textContent = "entering...";
 
   fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: body
+    body: JSON.stringify({ action: "join", username })
   })
-  .then(function(res) { return res.json(); })
-  .then(function(data) {
-    if (data.ok) {
-      playerKey  = data.player_key;
-      myUsername = username;
-      localStorage.setItem("ww_player_key", playerKey);
-      localStorage.setItem("ww_username", myUsername);
-      enterGame();
-    } else {
-      joinError.textContent = friendlyError(data.error);
-      joinBtn.disabled = false;
-      joinBtn.textContent = "Enter World";
+  .then(res => {
+    if (!res.ok) throw new Error("Server returned " + res.status);
+    return res.json();
+  })
+  .then(data => {
+    console.log("JOIN:", data);
+
+    if (!data.player_key) {
+      throw new Error(data.error || data.message || "No player_key returned");
     }
+
+    playerKey  = data.player_key;  
+    myUsername = username;
+
+    enterGame();
   })
-  .catch(function() {
-    joinError.textContent = "Could not reach server.";
-    joinBtn.disabled = false;
-    joinBtn.textContent = "Enter World";
+  .catch(err => {
+    console.error("JOIN ERROR:", err);
+    joinError.textContent = "join failed: " + err.message;
+    joinBtn.disabled   = false;
+    joinBtn.textContent  = "Enter World";
   });
 }
 
-// ── Enter game ───────────────────────────────
 function enterGame() {
   joinScreen.classList.add("hidden");
   gameScreen.classList.remove("hidden");
-  hudPlayerName.textContent = myUsername;
 
-  fetchAndRender();
-  pollInterval = setInterval(fetchAndRender, 1000);
+  hudPlayerName.textContent = myUsername;
+  chatHistory = [];
+  renderHistory();
+
+  fetchWorld();
+  pollInterval = setInterval(fetchWorld, 1500);
 }
 
-// ── Leave ────────────────────────────────────
 function handleLeave() {
   clearInterval(pollInterval);
+  pollInterval = null;
+
   playerKey  = null;
   myUsername = null;
-  localStorage.removeItem("ww_player_key");
-  localStorage.removeItem("ww_username");
+
   gameScreen.classList.add("hidden");
   joinScreen.classList.remove("hidden");
-  joinBtn.disabled = false;
-  joinBtn.textContent = "Enter World";
-  usernameInput.value = "";
+
+  joinBtn.disabled   = false;
+  joinBtn.textContent  = "Enter World";
+  usernameInput.value  = "";
 }
 
-// ── Fetch & render world ─────────────────────
-function fetchAndRender() {
+function fetchWorld() {
   fetch(API_URL)
-  .then(function(res) { return res.json(); })
-  .then(function(state) {
-    renderWorld(state);
-  })
-  .catch(function() {
-    // silently retry next tick
-  });
+    .then(res => {
+      if (!res.ok) throw new Error("Poll failed " + res.status);
+      return res.json();
+    })
+    .then(state => {
+      renderWorld(state);
+    })
+    .catch(err => {
+      console.error("FETCH ERROR:", err);
+    });
 }
+
+let prevMessages = {}; 
 
 function renderWorld(state) {
-  let players = state.players || [];
-
-  // Update player count
+  const players = state.players || [];
   playerCount.textContent = "👥 " + players.length;
 
-  // Clear old render
+  for (const p of players) {
+    if (p.message && p.message !== prevMessages[p.username]) {
+      prevMessages[p.username] = p.message;
+      addHistory(p.username, p.message);
+    }
+  }
+
   worldContainer.innerHTML = "";
 
-  for (let i = 0; i < players.length; i++) {
-    let p = players[i];
-
-    let wrap = document.createElement("div");
+  for (const p of players) {
+    const wrap = document.createElement("div");
     wrap.className = "player-wrap";
-
-    if (p.username === myUsername) {
-      wrap.classList.add("is-me");
-    }
-    if (p.username === "Cow") {
-      wrap.classList.add("is-cow");
-    }
-
     wrap.style.left = p.x + "px";
     wrap.style.top  = p.y + "px";
 
-    // Speech bubble
     if (p.message) {
-      let bubble = document.createElement("div");
-      bubble.className = "speech-bubble";
+      const bubble = document.createElement("div");
+      bubble.className  = "speech-bubble";
       bubble.textContent = p.message;
       wrap.appendChild(bubble);
     }
 
-    // Sprite image
-    let img = document.createElement("img");
+    const img = document.createElement("img");
     img.className = "player-sprite";
     img.src = "https://tinkr.tech" + p.image;
-    img.alt = p.username;
     wrap.appendChild(img);
 
-    // Username label
-    let nameLabel = document.createElement("div");
-    nameLabel.className = "player-name";
-    nameLabel.textContent = p.username;
-    wrap.appendChild(nameLabel);
+    const nameEl = document.createElement("div");
+    nameEl.className  = "player-name";
+    nameEl.textContent = p.username;
+    if (p.username === myUsername) nameEl.classList.add("is-me");
+    wrap.appendChild(nameEl);
 
     worldContainer.appendChild(wrap);
   }
 }
 
-// ── Move ─────────────────────────────────────
-function handleWorldClick(e) {
-  if (!playerKey) return;
+function handleMove(e) {
+  if (!playerKey) {
+    console.warn("MOVE blocked: no playerKey");
+    return;
+  }
 
-  let rect = worldContainer.getBoundingClientRect();
+  const rect = worldContainer.getBoundingClientRect();
   let x = Math.round(e.clientX - rect.left);
   let y = Math.round(e.clientY - rect.top);
 
-  // Clamp to valid bounds
   x = Math.max(0, Math.min(800, x));
   y = Math.max(0, Math.min(600, y));
 
-  // Visual click ripple
-  let ripple = document.createElement("div");
-  ripple.className = "click-ripple";
-  ripple.style.left = x + "px";
-  ripple.style.top  = y + "px";
-  worldContainer.appendChild(ripple);
-  setTimeout(function() {
-    if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
-  }, 600);
+  console.log("MOVE →", x, y, "key:", playerKey);
 
-  let body = JSON.stringify({
-    action: "move",
-    player_key: playerKey,
-    x: x,
-    y: y
-  });
+  spawnRipple(x, y);
 
   fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: body
+    body: JSON.stringify({
+      action: "move",
+      player_key: playerKey,   
+      x,
+      y
+    })
   })
-  .then(function(res) { return res.json(); })
-  .then(function(data) {
-    if (!data.ok) {
-      if (data.error === "invalid_player") {
-        handleLeave();
-      }
+  .then(res => {
+    if (!res.ok) {
+      return res.json().then(d => { throw new Error(d.error || d.message || res.status); });
     }
+    return res.json();
   })
-  .catch(function() {});
+  .then(data => {
+    console.log("MOVE RESPONSE:", data);
+    if (data.error) console.warn("MOVE rejected by server:", data.error);
+  })
+  .catch(err => {
+    console.error("MOVE ERROR:", err.message);
+  });
 }
 
-// ── Talk ─────────────────────────────────────
+function spawnRipple(x, y) {
+  const r = document.createElement("div");
+  r.className = "click-ripple";
+  r.style.left = x + "px";
+  r.style.top  = y + "px";
+  worldContainer.appendChild(r);
+  setTimeout(() => r.remove(), 600);
+}
+
+function openTalk() {
+  talkPanel.classList.remove("hidden");
+  talkInput.value = "";
+  talkError.textContent = "";
+  talkInput.focus();
+}
+
+function closeTalk() {
+  talkPanel.classList.add("hidden");
+  talkInput.blur();
+}
+
 function handleTalk() {
-  let message = talkInput.value.trim();
-  if (!message) {
-    talkError.textContent = "Type something first!";
+  const msg = talkInput.value.trim();
+
+  if (!msg) {
+    talkError.textContent = "say something 🌿";
     return;
   }
-  if (message.length > 200) {
-    talkError.textContent = "Max 200 characters.";
+
+  if (!playerKey) {
+    talkError.textContent = "not connected";
     return;
   }
 
   talkSendBtn.disabled = true;
   talkError.textContent = "";
 
-  let body = JSON.stringify({
-    action: "talk",
-    player_key: playerKey,
-    message: message
-  });
-
   fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: body
+    body: JSON.stringify({
+      action: "talk",
+      player_key: playerKey,
+      message: msg
+    })
   })
-  .then(function(res) { return res.json(); })
-  .then(function(data) {
-    if (data.ok) {
-      talkPanel.classList.add("hidden");
-    } else {
-      talkError.textContent = friendlyError(data.error);
+  .then(res => {
+    if (!res.ok) {
+      return res.json().then(d => { throw new Error(d.error || d.message || res.status); });
     }
-    talkSendBtn.disabled = false;
+    return res.json();
   })
-  .catch(function() {
-    talkError.textContent = "Could not reach server.";
+  .then(data => {
+    console.log("CHAT:", data);
+    if (data.error) {
+      talkError.textContent = "server: " + data.error;
+    } else {
+      closeTalk();
+    }
+  })
+  .catch(err => {
+    console.error("CHAT ERROR:", err);
+    talkError.textContent = "send failed: " + err.message;
+  })
+  .finally(() => {
     talkSendBtn.disabled = false;
   });
 }
 
-// ── Error messages ───────────────────────────
-function friendlyError(code) {
-  if (code === "username_taken")  return "That name is already taken!";
-  if (code === "invalid_username") return "Invalid name (too long, empty, or reserved).";
-  if (code === "invalid_player")  return "Session expired. Please rejoin.";
-  if (code === "out_of_bounds")   return "Out of bounds!";
-  if (code === "message_too_long") return "Message too long (max 200 chars).";
-  return "Error: " + code;
+function addHistory(username, message) {
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,"0") + ":"
+             + now.getMinutes().toString().padStart(2,"0");
+
+  chatHistory.push({ username, message, time });
+
+  if (chatHistory.length > 50) chatHistory.shift();
+
+  renderHistory();
 }
 
-// ── Start ────────────────────────────────────
-init();
+function renderHistory() {
+  if (!historyLog) return;
+
+  historyLog.innerHTML = chatHistory.length === 0
+    ? '<div class="history-empty">no messages yet 🌱</div>'
+    : chatHistory.map(e =>
+        `<div class="history-entry">
+          <span class="history-time">${e.time}</span>
+          <span class="history-user">${escHtml(e.username)}</span>
+          <span class="history-msg">${escHtml(e.message)}</span>
+        </div>`
+      ).join("");
+
+  historyLog.scrollTop = historyLog.scrollHeight;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
